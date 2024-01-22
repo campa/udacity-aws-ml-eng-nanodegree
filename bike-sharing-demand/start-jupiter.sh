@@ -8,4 +8,5 @@ docker run \
     -v "${mount}":/home/jovyan \
     -p 8888:8888 \
     --user root \
-    quay.io/jupyter/base-notebook
+    quay.io/jupyter/base-notebook \
+    start-notebook.py --IdentityProvider.token=''
