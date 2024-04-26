@@ -17,7 +17,7 @@ cd lambdas/classifyEncodedImg
 rm -rf package
 mkdir package
 cp lambda_function.py package/
-pip install sagemaker --target ./package
+pip install --target ./package sagemaker
 cd package
 ## Reduce the size
 find . -type d -name "tests" -exec rm -rfv {} +
