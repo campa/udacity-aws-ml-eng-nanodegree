@@ -175,3 +175,5 @@ cython_debug/
 
 **/package/
 **/lambdas/**/*.zip
+
+./nlp-image-classification/data/dogImages
