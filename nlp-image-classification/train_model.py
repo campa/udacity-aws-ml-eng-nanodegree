@@ -10,6 +10,8 @@ import torchvision.transforms as transforms
 
 import argparse
 
+import smdebug.pytorch as smd
+
 
 #TODO: Import dependencies for Debugging andd Profiling
 
@@ -19,7 +21,9 @@ def test(model, test_loader):
           testing data loader and will get the test accuray/loss of the model
           Remember to include any debugging/profiling hooks that you might need
     '''
-    pass
+    model.eval()
+    hook.set_mode(smd.modes.EVAL)
+    
 
 def train(model, train_loader, criterion, optimizer):
     '''
@@ -27,7 +31,11 @@ def train(model, train_loader, criterion, optimizer):
           data loaders for training and will get train the model
           Remember to include any debugging/profiling hooks that you might need
     '''
-    pass
+
+    model.train()
+    hook.set_mode(smd.modes.TRAIN)
+
+    
     
 def net():
     '''

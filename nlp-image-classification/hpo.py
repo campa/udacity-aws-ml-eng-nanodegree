@@ -6,9 +6,11 @@ import torch.nn as nn
 import torch.optim as optim
 import torchvision
 import torchvision.models as models
+import torchvision.datasets as datasets
 import torchvision.transforms as transforms
 
 import argparse
+import os
 
 def test(model, test_loader):
     '''
@@ -47,7 +49,9 @@ def net():
     TODO: Complete this function that initializes your model
           Remember to use a pretrained model
     '''
-    pass
+    model = torch.hub.load('pytorch/vision:v0.10.0', 'resnet18', weights='ResNet18_Weights.DEFAULT')
+
+    return model
 
 def create_data_loaders(data, batch_size):
     '''
@@ -65,71 +69,57 @@ def main(args):
     '''
     TODO: Create your loss and optimizer
     '''
-    loss_criterion = None
-    optimizer = None
+    loss_criterion = torch.nn.MSELoss()
+    optimizer = optim.Adadelta(model.parameters(), lr=args.learning_rate)
     
     '''
     TODO: Call the train function to start training your model
     Remember that you will need to set up a way to get training data from S3
     '''
+    # model=train(model, train_loader, loss_criterion, optimizer)
+   
+    # train_kwargs = {"batch_size": args.batch_size}
+
+    dataset_train = datasets.ImageFolder(args.train)
+    train_loader = torch.utils.data.DataLoader(dataset_train, batch_size=args.batch_size)
     model=train(model, train_loader, loss_criterion, optimizer)
     
     '''
     TODO: Test the model to see its accuracy
     '''
-    test(model, test_loader, criterion)
+    # test(model, test_loader, criterion)
+
+    # test_kwargs = {"batch_size": args.test_batch_size}
+    dataset_test = datasets.ImageFolder(args.test)
+    test_loader = torch.utils.data.DataLoader(dataset_test, batch_size=args.test_batch_size)
+    test(model, test_loader, loss_criterion)
     
     '''
     TODO: Save the trained model
     '''
-    torch.save(model, path)
+    # torch.save(model, path)
+
+    torch.save(model, args.model-dir)
+    # torch.save(model, "nlp-img-classification-train-deploy.pt")
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser()
     '''
     TODO: Specify all the hyperparameters you need to use to train your model.
     '''
+
+     # hyperparameters sent by the client are passed as command-line arguments to the script.
+    parser.add_argument('--epochs', type=int, default=50)
+    parser.add_argument('--batch-size', type=int, default=64)
+    parser.add_argument('--learning-rate', type=float, default=0.05)
+    parser.add_argument('--use-cuda', type=bool, default=False)
+
+    # Data, model, and output directories
+    parser.add_argument('--output-data-dir', type=str, default=os.environ['SM_OUTPUT_DATA_DIR'])
+    parser.add_argument('--model-dir', type=str, default=os.environ['SM_MODEL_DIR'])
+    parser.add_argument('--train', type=str, default=os.environ['SM_CHANNEL_TRAIN'])
+    parser.add_argument('--test', type=str, default=os.environ['SM_CHANNEL_TEST'])
     
-    parser.add_argument(
-        "--batch-size",
-        type=int,
-        default=64,
-        metavar="N",
-        help="input batch size for training (default: 64)",
-    )
-    parser.add_argument(
-        "--test-batch-size",
-        type=int,
-        default=1000,
-        metavar="N",
-        help="input batch size for testing (default: 1000)",
-    )
-    parser.add_argument(
-        "--epochs",
-        type=int,
-        default=2,
-        metavar="N",
-        help="number of epochs to train (default: 14)",
-    )
-    parser.add_argument(
-        "--lr", type=float, default=1.0, metavar="LR", help="learning rate (default: 1.0)"
-    )
     args = parser.parse_args()
-    
+    print("hpo.args", args)
     main(args)
-
-    train_kwargs = {"batch_size": args.batch_size}
-    test_kwargs = {"batch_size": args.test_batch_size}
-
-    train_loader = torch.utils.data.DataLoader(dataset1, **train_kwargs)
-    test_loader = torch.utils.data.DataLoader(dataset2, **test_kwargs)
-
-    model = Net()
-
-    optimizer = optim.Adadelta(model.parameters(), lr=args.lr)
-
-    for epoch in range(1, args.epochs + 1):
-        train(model, train_loader, optimizer, epoch)
-        test(model, test_loader)
-    
-    torch.save(model.state_dict(), "nlp-img-classification-train-deploy.pt")
