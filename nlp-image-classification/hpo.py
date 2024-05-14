@@ -11,6 +11,12 @@ import torchvision.transforms as transforms
 
 import argparse
 import os
+import sys
+import logging
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+logger.addHandler(logging.StreamHandler(sys.stdout))
 
 def test(model, test_loader):
     '''
@@ -18,31 +24,47 @@ def test(model, test_loader):
           testing data loader and will get the test accuray/loss of the model
           Remember to include any debugging/profiling hooks that you might need
     '''
-    pass
+    model.eval()
+    test_loss = 0
+    correct = 0
+    with torch.no_grad():
+        for data, target in test_loader:
+            output = model(data)
+            test_loss += F.nll_loss(output, target, size_average=False).item()  # sum up batch loss
+            pred = output.max(1, keepdim=True)[1]  # get the index of the max log-probability
+            correct += pred.eq(target.view_as(pred)).sum().item()
 
-def train(model, train_loader, criterion, optimizer):
+    test_loss /= len(test_loader.dataset)
+    logger.info(
+        "Test set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n".format(
+            test_loss, correct, len(test_loader.dataset), 100.0 * correct / len(test_loader.dataset)
+        )
+    )
 
+def train(model, train_loader, criterion, optimizer):    
     '''
     TODO: Complete this function that can take a model and
           data loaders for training and will get train the model
           Remember to include any debugging/profiling hooks that you might need
     '''
-    for batch_idx, (data, target) in enumerate(train_loader):
-        optimizer.zero_grad()
-        output = model(data)
-        loss = criterion(output, target)
-        loss.backward()
-        optimizer.step()
-        if batch_idx % 100 == 0:
-            print(
-                "Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}".format(
-                    epoch,
-                    batch_idx * len(data),
-                    len(train_loader.dataset),
-                    100.0 * batch_idx / len(train_loader),
-                    loss.item(),
+    for epoch in range(1, args.epochs + 1):
+        model.train()
+        for batch_idx, (data, target) in enumerate(train_loader, 1):
+            optimizer.zero_grad()
+            output = model(data)
+            loss = criterion(output, target)
+            loss.backward()
+            optimizer.step()
+            if batch_idx % 100 == 0:
+                logger.info(
+                    "Train Epoch: {} [{}/{} ({:.0f}%)] Loss: {:.6f}".format(
+                        epoch,
+                        batch_idx * len(data),
+                        len(train_loader.dataset),
+                        100.0 * batch_idx / len(train_loader),
+                        loss.item(),
+                    )
                 )
-            )
     
 def net():
     '''
@@ -50,15 +72,63 @@ def net():
           Remember to use a pretrained model
     '''
     model = torch.hub.load('pytorch/vision:v0.10.0', 'resnet18', weights='ResNet18_Weights.DEFAULT')
+    
+    #freeze model params
+    for param in model.parameters():
+        param = param.requires_grad_(False)
 
+    #new layer
+    model.fc = nn.Sequential(
+                        nn.Linear(model.fc.in_features, 256),
+                        nn.ReLU(),
+                        nn.Dropout(0.4),
+                        nn.Linear(256, 133),               # num of classes    ? 
+                        nn.LogSoftmax(dim=1))
+
+
+    print("The new layer is : ",model.fc)
+    # model = model.to(device) #Moving the model to GPU
+    
     return model
 
-def create_data_loaders(data, batch_size):
+def _get_test_data_loader(test_batch_size, training_dir):
+    logger.info("Get test data loader")
+    transform_test = transforms.Compose([
+        transforms.Resize(256),
+        transforms.CenterCrop(224),
+        transforms.ToTensor(),
+        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+    ])
+
+    dataset_test = datasets.ImageFolder(training_dir, transform=transform_test)
+    test_loader = torch.utils.data.DataLoader(dataset_test, batch_size=test_batch_size)
+    return test_loader
+
+def _get_train_data_loader(batch_size, training_dir):
+    logger.info("Get train data loader")
+    transform_train = transforms.Compose([
+        transforms.Resize(256),
+        transforms.CenterCrop(224),
+        transforms.RandomGrayscale(p=0.1),
+        transforms.ToTensor(),
+        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+    ])
+
+    dataset_train = datasets.ImageFolder(training_dir, transform=transform_train)
+    train_loader = torch.utils.data.DataLoader(dataset_train, batch_size=batch_size)
+    return train_loader
+
+def save_model(model, model_dir):
     '''
-    This is an optional function that you may or may not need to implement
-    depending on whether you need to use data loaders or not
+    TODO: Save the trained model
     '''
-    pass
+    # torch.save(model, path)
+    logger.info("Saving the model.")
+    # path = os.path.join(args.model-dir, "model.pth")
+    # torch.save(model.cpu().state_dict(), path)
+
+    torch.save(model, model-dir)
+    # torch.save(model, "nlp-img-classification-train-deploy.pt")
 
 def main(args):
     '''
@@ -69,7 +139,7 @@ def main(args):
     '''
     TODO: Create your loss and optimizer
     '''
-    loss_criterion = torch.nn.MSELoss()
+    loss_criterion = torch.nn.CrossEntropyLoss()
     optimizer = optim.Adadelta(model.parameters(), lr=args.learning_rate)
     
     '''
@@ -80,8 +150,7 @@ def main(args):
    
     # train_kwargs = {"batch_size": args.batch_size}
 
-    dataset_train = datasets.ImageFolder(args.train)
-    train_loader = torch.utils.data.DataLoader(dataset_train, batch_size=args.batch_size)
+    train_loader = _get_train_data_loader(args.batch_size, args.train)
     model=train(model, train_loader, loss_criterion, optimizer)
     
     '''
@@ -90,17 +159,10 @@ def main(args):
     # test(model, test_loader, criterion)
 
     # test_kwargs = {"batch_size": args.test_batch_size}
-    dataset_test = datasets.ImageFolder(args.test)
-    test_loader = torch.utils.data.DataLoader(dataset_test, batch_size=args.test_batch_size)
+    test_loader = _get_train_data_loader(args.test_batch_size, args.test)
     test(model, test_loader, loss_criterion)
     
-    '''
-    TODO: Save the trained model
-    '''
-    # torch.save(model, path)
-
-    torch.save(model, args.model-dir)
-    # torch.save(model, "nlp-img-classification-train-deploy.pt")
+    save_model(model, args.model-dir)
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser()
