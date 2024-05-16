@@ -12,6 +12,14 @@ import argparse
 
 import smdebug.pytorch as smd
 
+import os
+import sys
+import logging
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+logger.addHandler(logging.StreamHandler(sys.stdout))
+
 
 #TODO: Import dependencies for Debugging andd Profiling
 
@@ -69,16 +77,34 @@ def train(model, train_loader, optimizer, epoch, hook):
 
     
     
-def net(model-dir):
+def net(model_path):
     '''
     TODO: Complete this function that initializes your model
           Remember to use a pretrained model
     '''
 
-    model = torch.load(model-dir)
+    # model = torch.load(model_path)
+
+    model = torch.hub.load('pytorch/vision:v0.10.0', 'resnet18', weights='ResNet18_Weights.DEFAULT')
+    
+    #freeze model params
+    for param in model.parameters():
+        param = param.requires_grad_(False)
+
+    #new layer
+    model.fc = nn.Sequential(
+                        nn.Linear(model.fc.in_features, 256),
+                        nn.ReLU(),
+                        nn.Dropout(0.4),
+                        nn.Linear(256, 133),               # num of classes    ? 
+                        nn.LogSoftmax(dim=1))
+
+
+    logger.info("The new layer is : %s ",model.fc)
+
     return model
 
-def _get_test_data_loader(test_batch_size, training_dir):
+def _get_test_data_loader(batch_size, training_dir):
     logger.info("Get test data loader")
     transform_test = transforms.Compose([
         transforms.Resize(256),
@@ -88,7 +114,7 @@ def _get_test_data_loader(test_batch_size, training_dir):
     ])
 
     dataset_test = datasets.ImageFolder(training_dir, transform=transform_test)
-    test_loader = torch.utils.data.DataLoader(dataset_test, batch_size=test_batch_size)
+    test_loader = torch.utils.data.DataLoader(dataset_test, batch_size=batch_size)
     return test_loader
 
 def _get_train_data_loader(batch_size, training_dir):
@@ -110,7 +136,7 @@ def main(args):
     TODO: Initialize a model by calling the net function
     '''
     # model=net()
-    model=net(args.model-dir)
+    model=net(args.model_dir)
     
     '''
     TODO: Create your loss and optimizer
@@ -127,7 +153,7 @@ def main(args):
     '''
     TODO: Test the model to see its accuracy
     '''
-    test_loader = _get_train_data_loader(args.test_batch_size, args.test)
+    test_loader = _get_train_data_loader(args.batch_size, args.test)
     
     '''
     TODO: Save the trained model
@@ -135,8 +161,7 @@ def main(args):
 
     hook = smd.Hook.create_from_json_file()
     hook.register_hook(model)
-
-    optimizer = optim.Adadelta(model.parameters(), lr=args.lr)
+    hook.register_loss(loss_fn)
 
     for epoch in range(1, args.epochs + 1):
         train(model, train_loader, optimizer, epoch, hook)
@@ -162,5 +187,5 @@ if __name__=='__main__':
     parser.add_argument('--test', type=str, default=os.environ['SM_CHANNEL_TEST'])
     
     args = parser.parse_args()
-    print("hpo.args", args)
+    print("train_model.args", args)
     main(args)

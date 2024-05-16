@@ -86,12 +86,12 @@ def net():
                         nn.LogSoftmax(dim=1))
 
 
-    print("The new layer is : ",model.fc)
+    logger.info("The new layer is : %s ",model.fc)
     # model = model.to(device) #Moving the model to GPU
     
     return model
 
-def _get_test_data_loader(test_batch_size, training_dir):
+def _get_test_data_loader(batch_size, training_dir):
     logger.info("Get test data loader")
     transform_test = transforms.Compose([
         transforms.Resize(256),
@@ -101,7 +101,7 @@ def _get_test_data_loader(test_batch_size, training_dir):
     ])
 
     dataset_test = datasets.ImageFolder(training_dir, transform=transform_test)
-    test_loader = torch.utils.data.DataLoader(dataset_test, batch_size=test_batch_size)
+    test_loader = torch.utils.data.DataLoader(dataset_test, batch_size=batch_size)
     return test_loader
 
 def _get_train_data_loader(batch_size, training_dir):
@@ -158,11 +158,10 @@ def main(args):
     '''
     # test(model, test_loader, criterion)
 
-    # test_kwargs = {"batch_size": args.test_batch_size}
-    test_loader = _get_train_data_loader(args.test_batch_size, args.test)
+    test_loader = _get_train_data_loader(args.batch_size, args.test)
     test(model, test_loader, loss_criterion)
     
-    save_model(model, args.model-dir)
+    save_model(model, args.model_dir)
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser()
@@ -183,5 +182,5 @@ if __name__=='__main__':
     parser.add_argument('--test', type=str, default=os.environ['SM_CHANNEL_TEST'])
     
     args = parser.parse_args()
-    print("hpo.args", args)
+    logger.info("hpo.args: " + args)
     main(args)
