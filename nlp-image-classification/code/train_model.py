@@ -6,7 +6,9 @@ import torch.nn as nn
 import torch.optim as optim
 import torchvision
 import torchvision.models as models
+import torchvision.datasets as datasets
 import torchvision.transforms as transforms
+import torch.nn.functional as F
 
 import argparse
 
@@ -161,7 +163,7 @@ def main(args):
 
     hook = smd.Hook.create_from_json_file()
     hook.register_hook(model)
-    hook.register_loss(loss_fn)
+    hook.register_loss(loss_criterion)
 
     for epoch in range(1, args.epochs + 1):
         train(model, train_loader, optimizer, epoch, hook)
