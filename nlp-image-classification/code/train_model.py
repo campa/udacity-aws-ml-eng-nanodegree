@@ -9,6 +9,7 @@ import torchvision.models as models
 import torchvision.datasets as datasets
 import torchvision.transforms as transforms
 import torch.nn.functional as F
+from PIL import ImageFile
 
 import argparse
 
@@ -50,6 +51,9 @@ def test(model, test_loader, hook):
         )
     )
 
+    hook.save_scalar("test_loss", test_loss)
+    hook.save_scalar("accuracy", 100.0 * correct / len(test_loader.dataset))
+
     
 
 def train(model, train_loader, optimizer, epoch, hook):
@@ -76,6 +80,7 @@ def train(model, train_loader, optimizer, epoch, hook):
                     loss.item(),
                 )
             )
+            hook.save_scalar("loss", loss.item())
 
     
     
@@ -121,6 +126,9 @@ def _get_test_data_loader(batch_size, training_dir):
 
 def _get_train_data_loader(batch_size, training_dir):
     logger.info("Get train data loader")
+
+    ImageFile.LOAD_TRUNCATED_IMAGES = True
+
     transform_train = transforms.Compose([
         transforms.Resize(256),
         transforms.CenterCrop(224),
@@ -169,7 +177,7 @@ def main(args):
         train(model, train_loader, optimizer, epoch, hook)
         test(model, test_loader, hook)
 
-    torch.save(model, path)
+    torch.save(model, args.model_dir)
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser()
